@@ -1,4 +1,5 @@
-import { getDb, assignmentKey } from './db'
+import { getDb, assignmentKey, type ChromaDB } from './db'
+import type { IDBPTransaction } from 'idb'
 import { parseTeachersCsv, parseSubjectsCsv, parseRoomsCsv, parseSectionsCsv, parseSessionsCsv, parseAvailabilityCsv } from './csv/entityParsers'
 import { validateCrossFileReferences } from './csv/crossFileValidator'
 import type { CsvValidationError } from './csv/validation'
@@ -225,7 +226,7 @@ export async function validateRun(runId: string): Promise<ConstraintViolation[]>
   const violations = validateAssignmentMap(applyIdentityOverrides(input, overrides), assignmentMap, roomBySession)
 
   const db = await getDb()
-  const tx = db.transaction('conflicts', 'readwrite')
+  const tx = db.transaction(['assignments', 'conflicts'], 'readwrite')
   await replaceConflicts(tx, runId, violations)
   await tx.done
   return violations
@@ -504,14 +505,14 @@ async function createVersion(
 }
 
 async function persistAssignmentsAndConflicts(
-  tx: ReturnType<Awaited<ReturnType<typeof getDb>>['transaction']>,
+  tx: IDBPTransaction<ChromaDB, any, 'readwrite'>,
   runId: string,
   assignments: Map<string, Timeslot>,
   roomBySession: Map<string, string | undefined>,
   violations: ConstraintViolation[],
   identityOverrides: Map<string, IdentityOverride> = new Map(),
 ) {
-  const assignmentsStore = tx.objectStore('assignments')
+  const assignmentsStore = tx.objectStore('assignments') as NonNullable<ReturnType<typeof tx.objectStore>>
   for (const [sessionId, ts] of assignments) {
     const row: ScheduleAssignment = {
       scheduleRunId: runId,
@@ -527,12 +528,12 @@ async function persistAssignmentsAndConflicts(
 }
 
 async function replaceConflicts(
-  tx: ReturnType<Awaited<ReturnType<typeof getDb>>['transaction']>,
+  tx: IDBPTransaction<ChromaDB, any, 'readwrite'>,
   runId: string,
   violations: ConstraintViolation[],
 ) {
-  const conflictsStore = tx.objectStore('conflicts')
-  const existingKeys = await conflictsStore.index('scheduleRunId').getAllKeys(runId)
+  const conflictsStore = tx.objectStore('conflicts') as NonNullable<ReturnType<typeof tx.objectStore>>
+  const existingKeys = await (conflictsStore.index as any)('scheduleRunId').getAllKeys(runId)
   for (const key of existingKeys) await conflictsStore.delete(key)
   for (const v of violations) {
     const record: ConflictRecord = {

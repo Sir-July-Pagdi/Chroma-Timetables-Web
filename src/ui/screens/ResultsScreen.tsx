@@ -22,7 +22,7 @@ export default function ResultsScreen() {
 
   useEffect(() => {
     if (!runId) return
-    getRun(runId).then(setRun)
+    getRun(runId).then((run) => setRun(run ?? null))
     getRunSessionStates(runId).then(setRows)
     getConflicts(runId).then(setConflicts)
   }, [runId])

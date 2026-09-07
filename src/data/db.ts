@@ -1,7 +1,7 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 import type { ConflictRecord, PeriodBlockConfig, RosterSnapshot, ScheduleAssignment, ScheduleRun } from '../domain/types'
 
-interface ChromaDB extends DBSchema {
+export interface ChromaDB extends DBSchema {
   runs: {
     key: string
     value: ScheduleRun
